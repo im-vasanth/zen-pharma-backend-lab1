@@ -201,13 +201,6 @@ jobs:
           exit-code: '0'
           ignore-unfixed: true
 
-      - name: Ensure Trivy SARIF exists
-        if: always()
-        run: |
-          if [ ! -f trivy-results.sarif ]; then
-            echo '{"runs":[]}' > trivy-results.sarif
-          fi
-
       - name: Upload Trivy SARIF to GitHub Security tab
         if: always()
         uses: github/codeql-action/upload-sarif@v3
