@@ -205,40 +205,40 @@ jobs:
         run: |
           # Create a valid minimal SARIF with one run if file is missing, empty, malformed, or has zero runs.
           python - <<'PY'
-import json,sys
-from pathlib import Path
+          import json,sys
+          from pathlib import Path
 
-f=Path('trivy-results.sarif')
-valid=False
-if f.exists() and f.stat().st_size>0:
-    try:
-        j=json.loads(f.read_text())
-        if isinstance(j.get('runs'), list) and len(j['runs'])>0:
-            valid=True
-    except Exception:
-        valid=False
+          f=Path('trivy-results.sarif')
+          valid=False
+          if f.exists() and f.stat().st_size>0:
+              try:
+                  j=json.loads(f.read_text())
+                  if isinstance(j.get('runs'), list) and len(j['runs'])>0:
+                      valid=True
+              except Exception:
+                  valid=False
 
-if not valid:
-    minimal={
-        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-        "version": "2.1.0",
-        "runs": [
-            {
-                "tool": {
-                    "driver": {
-                        "name": "Trivy",
-                        "informationUri": "https://github.com/aquasecurity/trivy"
-                    }
+          if not valid:
+              minimal={
+                  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+                  "version": "2.1.0",
+                  "runs": [
+                      {
+                          "tool": {
+                              "driver": {
+                                  "name": "Trivy",
+                                  "informationUri": "https://github.com/aquasecurity/trivy"
+                          }
                 },
                 "results": []
-            }
-        ]
-    }
-    f.write_text(json.dumps(minimal))
-    print('Wrote minimal valid SARIF to', f)
-else:
-    print('Existing SARIF appears valid')
-PY
+                      }
+          ]
+          }
+          f.write_text(json.dumps(minimal))
+          print('Wrote minimal valid SARIF to', f)
+      else:
+        print('Existing SARIF appears valid')
+      PY
 
       - name: Inspect Trivy SARIF
         if: always()
