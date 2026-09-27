@@ -70,12 +70,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      #  Derive short-SHA image tag 
+      # Derive short-SHA image tag 
       - name: Set image tag
         id: meta
         run: echo "image_tag=sha-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      #  Java toolchain 
+      # Java toolchain 
       - name: Setup Java 17 (Temurin)
         uses: actions/setup-java@v4
         with:
@@ -83,7 +83,7 @@ jobs:
           distribution: temurin
           cache: maven
 
-      #  Optional PostgreSQL for services that need a DB in tests ─────────────
+      # Optional PostgreSQL for services that need a DB in tests ─────────────
       - name: Start PostgreSQL (integration tests)
         if: ${{ inputs.needs-database }}
         run: |
@@ -100,7 +100,7 @@ jobs:
           done
           echo "PostgreSQL is ready."
 
-      #  Initialize CodeQL tracer BEFORE Maven build 
+      # Initialize CodeQL tracer BEFORE Maven build 
       # CodeQL instruments the Maven compilation to collect call-graph data.
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -108,7 +108,7 @@ jobs:
           languages: java
           queries: security-extended
 
-      #  Maven verify (compiles, tests, JaCoCo) 
+      # Maven verify (compiles, tests, JaCoCo) 
       # mvn verify runs: compile → test → package → verify (JaCoCo coverage check)
       # The pom.xml must configure jacoco-maven-plugin with a minimum 80% line/branch rule.
       - name: Maven verify (tests + JaCoCo coverage gate ≥ 80%)
@@ -126,13 +126,13 @@ jobs:
           path: ${{ inputs.service-dir }}/target/site/jacoco/
           retention-days: 7
 
-      #  CodeQL analysis (uses results from the instrumented Maven build above) ─
+      # CodeQL analysis (uses results from the instrumented Maven build above) ─
       - name: CodeQL — Analyze
         uses: github/codeql-action/analyze@v3
         with:
           category: /language:java
 
-      #  OWASP Dependency Check 
+      # OWASP Dependency Check 
       # Optional repo secret NVD_API_KEY — higher NVD rate limits; see CI-ARCHITECTURE.md
       - name: Cache OWASP NVD database
         if: false
@@ -164,19 +164,18 @@ jobs:
           path: ${{ inputs.service-dir }}/target/dependency-check-report.html
           retention-days: 14
 
-      #  AWS credentials via OIDC (no long-lived keys) 
+      # AWS credentials via OIDC (no long-lived keys) 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/pharma-dev-github-actions-role
           aws-region: ${{ inputs.aws-region }}
 
-
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      #  Docker build (multi-stage, non-root UID/GID 1000) 
+      # Docker build (multi-stage, non-root UID/GID 1000) 
       - name: Build Docker image
         id: docker-build
         run: |
@@ -189,7 +188,7 @@ jobs:
             .
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
-      #  Trivy — image scan (fail on HIGH/CRITICAL CVEs) 
+      # Trivy — image scan (fail on HIGH/CRITICAL CVEs) 
       - name: Trivy — Image vulnerability scan
         uses: aquasecurity/trivy-action@0.28.0
         with:
@@ -199,26 +198,26 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: '0'
           ignore-unfixed: true
+
       - name: Ensure Trivy SARIF is valid
         if: always()
         run: |
-          # Create a valid minimal SARIF with one run if file is missing, empty, malformed, or has zero runs.
           python - <<'PY'
-          import json,sys
+          import json, sys
           from pathlib import Path
 
-          f=Path('trivy-results.sarif')
-          valid=False
-          if f.exists() and f.stat().st_size>0:
+          f = Path('trivy-results.sarif')
+          valid = False
+          if f.exists() and f.stat().st_size > 0:
               try:
-                  j=json.loads(f.read_text())
-                  if isinstance(j.get('runs'), list) and len(j['runs'])>0:
-                      valid=True
+                  j = json.loads(f.read_text())
+                  if isinstance(j.get('runs'), list) and len(j['runs']) > 0:
+                      valid = True
               except Exception:
-                  valid=False
+                  valid = False
 
           if not valid:
-              minimal={
+              minimal = {
                   "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
                   "version": "2.1.0",
                   "runs": [
@@ -227,17 +226,17 @@ jobs:
                               "driver": {
                                   "name": "Trivy",
                                   "informationUri": "https://github.com/aquasecurity/trivy"
-                          }
-                },
-                "results": []
+                              }
+                          },
+                          "results": []
                       }
-          ]
-          }
-          f.write_text(json.dumps(minimal))
-          print('Wrote minimal valid SARIF to', f)
-      else:
-        print('Existing SARIF appears valid')
-      PY
+                  ]
+              }
+              f.write_text(json.dumps(minimal))
+              print('Wrote minimal valid SARIF to', f)
+          else:
+              print('Existing SARIF appears valid')
+          PY
 
       - name: Inspect Trivy SARIF
         if: always()
@@ -246,20 +245,19 @@ jobs:
           ls -lh trivy-results.sarif || true
           echo 'Preview:'
           head -n 80 trivy-results.sarif || true
-          # Fail if SARIF contains zero runs (helps surface Trivy issues early)
           python - <<'PY'
-import json,sys
-try:
-    j=json.load(open('trivy-results.sarif'))
-    runs=len(j.get('runs',[]))
-    print('SARIF runs:', runs)
-    if runs==0:
-        print('SARIF contains zero runs — failing to surface issue')
-        sys.exit(1)
-except Exception as e:
-    print('Error parsing SARIF:', e)
-    sys.exit(1)
-PY
+          import json, sys
+          try:
+              j = json.load(open('trivy-results.sarif'))
+              runs = len(j.get('runs', []))
+              print('SARIF runs:', runs)
+              if runs == 0:
+                  print('SARIF contains zero runs — failing to surface issue')
+                  sys.exit(1)
+          except Exception as e:
+              print('Error parsing SARIF:', e)
+              sys.exit(1)
+          PY
 
       - name: Upload Trivy SARIF to GitHub Security tab
         if: always()
@@ -268,7 +266,7 @@ PY
           sarif_file: trivy-results.sarif
           category: trivy-${{ inputs.service-name }}
 
-      #  Push image to ECR 
+      # Push image to ECR 
       - name: Push image to ECR
         id: push
         run: |
@@ -279,9 +277,7 @@ PY
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
           echo "Pushed: $IMAGE  (digest: $DIGEST)"
 
-      #  Cosign keyless sign 
-      # GitHub OIDC token → Fulcio CA issues short-lived cert → Rekor audit log entry
-      # No long-lived signing keys. Kyverno policy in EKS verifies signature at admission.
+      # Cosign keyless sign 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
 
